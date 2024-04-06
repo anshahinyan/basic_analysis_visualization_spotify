@@ -1,0 +1,155 @@
+---
+title: "Spotify_analysis"
+author: "Ani Shahinyan"
+output:
+  pdf_document: default
+  html_document: default
+date: "2024-04-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(tidyr)
+```
+
+Summary of the data:
+
+```{r}
+sp_data <- read.csv("spotify_top_songs_audio_features.csv")
+summary(sp_data)
+```
+This gives a general idea about the data, but I also wanted to learn about the actual meanings of the columns, so that I could do a more thorough and fact-checked analysis and provide with useful conclusions. The ID column is used to distinctly identify each row of the column or in other words, each track. The artist_name and the track_name columns are self-explanatory, so I will skip them. The source column is the record label that produced each track. Sometimes it has the name of the artist, if no record label was producing. The key column is the key each song was written in. A key is often said to dictate the overall mood of a song. The mode is also related to the key. It tells us whether a song is in a minor or major key. Major keys are characterized as happier and brighter, while minor keys are associated with lower moods. The time signature is the number of beats in each measure. For example, "4 beats" means there are 4 beats in each measure.The rest of the columns are mostly special characteristics that Spotify measures. 
+
+Danceability is based on the tempo, rhythm stability, beat, and so on. While there are no precise methods I could find online, it seems that the maximum and minimum values are 0 and 1. As I found online, these values are confidence measures. So for example, if a song has an energy of 0.97, we are 97% confident that the song is energetic. This is why very rarely these numbers are 1 or 0, I assume.
+This seems to apply to the "energy", "sppechiness", "acousticness", "instrumentalness", "liveness", "valence" measures as well, so for simplicity I will skip mentioning that for these columns.
+
+Energy consists of the dynamic range, loudness, and the overall intensity and activity in a song. "Typically, energetic tracks feel fast, loud, and noisy. "For example, death metal has high energy, while a Bach prelude scores low on the scale"- as said by the official Spotify website.
+
+Speechiness represents which proportion of a song is spoken word. Again, a speechines of 0 represents mostly musical tracks, and a track with a speechiness of 1 is most likely an audiobook or a podcast. In our data, the row with the largest speechiness value is a skit. 
+
+Liveness is the likelihood that a track was performed live, valence is the overall "happiness" measure of a song. Loudness is a bit of a more complicated measure, but from what I could figure, it is measured in Loudness Units Full Scale, and this values needs to be around -14 for optimal listening. Some artists and producers seem to take advantage of the loudness to make their music sound more expressive, so we can see if the loudness actually plays a role in how popular or liked a song is by the public. 
+
+The tempo is the beats per minute, duration_ms is the length of a song in milliseconds, the weeks_on_chart is also self explanatory, as is the number of streams. Now we can start coming up with hypotheses and see if some measures are related. I thought of the correlation heatmap to be most useful for this, as it quickly and efficiently shows us the correlations, and makes it easy to see what we can work on. 
+``` {r}
+numeric_spot <- sp_data %>% select_if(is.numeric)
+cor_matrix <- cor(numeric_spot, use = "complete.obs")
+melted_cor_matrix <- melt(cor_matrix)
+
+ggplot(data = melted_cor_matrix, aes(x=Var1, y=Var2, fill=value)) +
+  geom_tile() + 
+  scale_fill_gradient2(low = "#fdd017", high = "#3e00b3", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Correlation") +
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) + 
+  labs(x='', y='', title='Correlation Heatmap of Spotify data') + 
+  coord_fixed() 
+```
+
+This gives us a more general idea about how some numeric columns are related and how they correlate. 
+As we can see, the highest correlation is between the streams and the weeks_on_chart column, so we can assume that the more streams a song has, the more likely it is that it has been on charts for a longer time. 
+
+We observe the second largest correlation between loudness and energy, which was quite expected: the louder the song is, the more energy it will have, and vice versa. There is little to no correlation between most factors, and the least correlation is between acousticness and energy, so we can say that acoustic songs are more likely to have less energy. 
+
+Another thing worth mentioning from a previous point is that the loudness of a song does not necessarily contribute to the number of streams a track can get, so the manipulation by mixers and producers does not really have a reason. It does contribute to energy though, but energy also does not have anything to do with the success of a song.
+
+Valence is highly correlated with energy, danceability, and loudness.
+
+Surprisingly, the number of streams a song has is not correlated with any of its musical qualities, but it only has to do with the number of weeks it has been on charts. The weeks_on_charts column also is not strongly correlated with anything but the streams. 
+
+We will take a more precise look of the correlated values in scatterplots.
+```{r}
+ggplot(sp_data, aes(x = streams, y = weeks_on_chart)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = " ",
+       x = "Streams",
+       y = "Weeks on chart") +
+  scale_y_log10()
+```
+
+
+```{r}
+ggplot(sp_data, aes(x = loudness, y = energy)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Loudness and Energy Scatterplot",
+       x = "Loudness",
+       y = "Energy") 
+
+```
+
+```{r}
+ggplot(sp_data, aes(x = acousticness, y = energy)) +
+  geom_point(alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Acousticness and Energy Scatterplot ",
+       x = "Acousticness",
+       y = "Energy") 
+
+```
+
+Danceability is a metric used by spotify to identify how good a song is for dance parties and such, or how upbeat it is, based on a few features such as tempo, beat, and so on. A very common opinion is that the danceability of songs is based on the key of it, and certain keys are associated with certain moods, and minor keys especially are considered to be low and slow. Here, we can tell that all the keys have around the same danceability, so even if you can't read keys, you can tell that the key of a song does not have a major influence on its danceability, on average.
+
+```{r}
+avg_danceability_by_key <- sp_data %>%
+  group_by(key) %>%
+  summarise(AverageDanceability = mean(danceability))
+
+ggplot(avg_danceability_by_key, aes(x = as.factor(key), y = AverageDanceability)) +
+  geom_bar(stat = "identity", fill = "#643B9F") +
+  theme_minimal() +
+  labs(title = "Average Danceability by Key",
+       x = "Key",
+       y = "Average Danceability") +
+  scale_x_discrete(name = "Key", labels = function(x) paste("Key", x))
+
+```
+
+I wanted to analyze the artists, so I decided to separate the main artists from the featured ones. I did this by assuming that the featured artists are the ones written after the first comma. Then I counted the number of times each artist occurs. After that, I just plotted the top 25 artists, because after around the 25th artists, and even before, the number started to look similar.
+
+```{r}
+artists_separated <- sp_data %>%
+  separate(artist_names, into = c("main_artist", "featured_artists"), sep = ",", extra = "merge", fill = "right")
+
+artist_counts <- artists_separated %>%
+  group_by(main_artist) %>%
+  summarise(Occurrences = n()) %>%
+  arrange(desc(Occurrences))
+
+top_artists <- artist_counts %>% 
+  top_n(25, Occurrences)
+
+ggplot(top_artists, aes(x = reorder(main_artist, Occurrences), y = Occurrences)) +
+  geom_bar(stat = "identity", fill = "#825B97") +
+  theme_minimal() +
+  labs(title = "25 most Often Occured", x = "Main Artist", y = "Occurrences") +
+  coord_flip()
+```
+
+The top 25 most often occured artists are above.
+
+
+And here are the top 25 artists by the number of streams.
+```{r}
+artist_streams <- artists_separated %>%
+  group_by(main_artist) %>%
+  summarise(total_streams = sum(streams)) %>%
+  arrange(desc(total_streams))
+
+top_25_artists <- head(artist_streams, 25)
+ggplot(top_25_artists, aes(x = reorder(main_artist, total_streams), y = total_streams)) +
+  geom_bar(stat = "identity", fill = "darkgreen") +
+  theme_minimal() +
+  labs(title = "Total Streams for Top 25 Artists", x = "Artist", y = "Total Streams") +
+  coord_flip()
+```
+
+If the data belongs to one particular person's streams, then the last two plots give us an idea on how many of the more popular artists a person listens to, as well as the person's top artist. In that case, Taylor Swift seems to be this person's favorite.
