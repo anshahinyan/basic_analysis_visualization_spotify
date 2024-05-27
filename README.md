@@ -1,2 +1,2 @@
-# basic_analysis_visualization_spotify
+# basic_eda_spotify
 Small analysis of some open-source Spotify data. 
